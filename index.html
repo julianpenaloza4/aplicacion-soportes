@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Análisis Estático CAD - Escáner de Objetos</title>
+  <title>Escáner Mecánico de Estructuras CAD</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -19,10 +19,6 @@
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
-  <!-- TensorFlow.js & COCO-SSD para Escanear Objetos -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-
   <style>
     .glass-panel {
       background: rgba(30, 41, 59, 0.85);
@@ -37,126 +33,82 @@
   <header class="glass-panel sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b border-slate-700">
     <div class="flex items-center space-x-3">
       <div class="p-2 bg-blue-600 rounded-lg shadow-lg">
-        <i class="fa-solid fa-cube text-lg text-white"></i>
+        <i class="fa-solid fa-camera-retro text-lg text-white"></i>
       </div>
       <div>
-        <h1 class="font-bold text-base text-white leading-none">Estática CAD Lab</h1>
-        <span class="text-[10px] text-slate-400">Escáner de Objetos (TensorFlow.js COCO-SSD)</span>
+        <h1 class="font-bold text-base text-white leading-none">AI Structure Scanner</h1>
+        <span class="text-[10px] text-slate-400">Análisis Estático Automático desde Foto</span>
       </div>
     </div>
     
-    <!-- Controls WebCam Scanner -->
-    <div class="flex items-center space-x-2">
-      <button id="toggle-cam" onclick="toggleCamera()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold flex items-center space-x-1.5 text-white transition">
-        <i class="fa-solid fa-expand text-white" id="cam-icon"></i>
-        <span id="cam-btn-text">Escanear Objetos</span>
-      </button>
-    </div>
+    <!-- API Key Quick Modal Toggle -->
+    <button onclick="promptApiKey()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs text-slate-300">
+      <i class="fa-solid fa-key text-amber-400 mr-1"></i> API Key
+    </button>
   </header>
 
-  <!-- WebCam Floating Video Feed -->
-  <div id="webcam-container" class="hidden fixed bottom-4 right-4 z-50 glass-panel rounded-xl p-2 shadow-2xl border border-slate-700 w-64">
-    <div class="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
-      <video id="webcam" class="w-full h-full object-cover" playsinline muted></video>
-      <canvas id="webcam-canvas" class="absolute inset-0 w-full h-full"></canvas>
-    </div>
-    <div id="scan-status-text" class="text-[10px] text-amber-400 mt-1 text-center font-semibold">Cargando modelo de objetos...</div>
-  </div>
-
-  <!-- Main Grid -->
+  <!-- Main Container -->
   <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
     
-    <!-- Left Panel: Controls & Theoretical Supports -->
-    <section class="lg:col-span-4 flex flex-col space-y-4">
+    <!-- Left Column: Camera Capture & Image Preview -->
+    <section class="lg:col-span-5 flex flex-col space-y-4">
       
-      <!-- Support Selector -->
-      <div class="glass-panel rounded-2xl p-4 border border-slate-700">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-cubes text-blue-400"></i> Catálogo de Soportes (2D)
+      <div class="glass-panel rounded-2xl p-4 border border-slate-700 flex flex-col items-center justify-center">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 w-full flex items-center gap-2">
+          <i class="fa-solid fa-expand text-blue-400"></i> Capture o Suba la Foto
         </h2>
-        <div class="grid grid-cols-2 gap-2 text-xs">
-          <button onclick="selectSupport('roller', this)" class="sup-btn p-2.5 bg-blue-600/20 border border-blue-500 rounded-xl text-left transition">
-            <span class="font-bold text-blue-300 block">Rodillo / Patín</span>
-            <span class="text-[10px] text-slate-400">1 Reacción ($\mathbf{F}_y$)</span>
-          </button>
-          <button onclick="selectSupport('pin', this)" class="sup-btn p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-left transition">
-            <span class="font-bold text-slate-200 block">Pasador Liso</span>
-            <span class="text-[10px] text-slate-400">2 Reacciones ($\mathbf{F}_x, \mathbf{F}_y$)</span>
-          </button>
-          <button onclick="selectSupport('fixed', this)" class="sup-btn p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-left transition">
-            <span class="font-bold text-slate-200 block">Empotramiento</span>
-            <span class="text-[10px] text-slate-400">3 Reacciones ($\mathbf{F}_x, \mathbf{F}_y, \mathbf{M}$)</span>
-          </button>
-          <button onclick="selectSupport('cable', this)" class="sup-btn p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-left transition">
-            <span class="font-bold text-slate-200 block">Cable / Eslabón</span>
-            <span class="text-[10px] text-slate-400">1 Tensión</span>
-          </button>
-        </div>
-      </div>
 
-      <!-- Controls & Sliders -->
-      <div class="glass-panel rounded-2xl p-4 border border-slate-700 space-y-4">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-          <i class="fa-solid fa-sliders text-amber-400"></i> Parámetros de Carga
-        </h2>
-        
-        <div class="space-y-3 text-xs">
-          <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-slate-300">Magnitud ($F$)</span>
-              <span id="val-force" class="font-mono text-amber-400">500 N</span>
-            </div>
-            <input type="range" id="slider-force" min="100" max="1000" value="500" step="50" oninput="updateParams()" class="w-full accent-amber-400 bg-slate-700 rounded-lg cursor-pointer">
-          </div>
+        <!-- Hidden File Input for Mobile Camera -->
+        <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageSelect(event)">
 
-          <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-slate-300">Ángulo ($\theta$)</span>
-              <span id="val-angle" class="font-mono text-amber-400">45°</span>
-            </div>
-            <input type="range" id="slider-angle" min="0" max="360" value="45" step="5" oninput="updateParams()" class="w-full accent-amber-400 bg-slate-700 rounded-lg cursor-pointer">
+        <!-- Preview Box / Camera Trigger -->
+        <div id="preview-container" onclick="document.getElementById('camera-input').click()" class="w-full h-64 border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center cursor-pointer bg-slate-950 overflow-hidden relative transition">
+          <img id="image-preview" class="hidden w-full h-full object-contain">
+          <div id="placeholder-text" class="text-center p-4">
+            <i class="fa-solid fa-camera text-4xl text-slate-600 mb-2"></i>
+            <p class="text-xs font-semibold text-slate-300">Toca aquí para tomar foto a la estructura</p>
+            <p class="text-[10px] text-slate-500 mt-1">Vigas, soportes, armaduras o ejercicios del libro</p>
           </div>
         </div>
 
-        <!-- Object Detector Live Status -->
-        <div id="detected-object-box" class="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
-          <span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Último Objeto Escaneado</span>
-          <span id="detected-name" class="font-bold text-emerald-400">Ningún objeto detectado</span>
-        </div>
+        <!-- Action Button -->
+        <button id="analyze-btn" onclick="analyzeStructureImage()" disabled class="w-full mt-3 py-2.5 bg-blue-600 disabled:bg-slate-800 disabled:text-slate-500 hover:bg-blue-500 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 text-white shadow-lg">
+          <i class="fa-solid fa-microchip"></i> Realizar Análisis Mecánico
+        </button>
+      </div>
 
-        <div id="theory-box" class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs leading-relaxed text-slate-300">
-          <p class="font-semibold text-blue-400 mb-1">Restricciones del Soporte:</p>
-          <p id="theory-desc">Un rodillo impide únicamente el movimiento perpendicular a la superficie. Ejerce una única fuerza normal.</p>
+      <!-- Quick Analysis Parameters -->
+      <div class="glass-panel rounded-2xl p-4 border border-slate-700 space-y-3">
+        <h3 class="text-xs font-semibold uppercase text-slate-400">Estado del Escáner</h3>
+        <div id="status-box" class="p-3 bg-slate-950/70 rounded-xl border border-slate-800 text-xs text-slate-300">
+          Esperando que tomes o selecciones una fotografía...
         </div>
       </div>
+
     </section>
 
-    <!-- Right Panel: Interactive Canvas Inspector -->
-    <section class="lg:col-span-8 flex flex-col space-y-4">
+    <!-- Right Column: Results & Interactive Diagram -->
+    <section class="lg:col-span-7 flex flex-col space-y-4">
       
+      <!-- DCL Diagram Box -->
       <div class="glass-panel rounded-2xl p-4 border border-slate-700 flex flex-col">
         <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-eye text-emerald-400"></i> Diagrama de Cuerpo Libre (DCL)
+          <i class="fa-solid fa-drafting-compass text-emerald-400"></i> Diagrama de Cuerpo Libre Reconstruido
         </h2>
 
-        <div class="relative w-full h-72 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+        <div class="relative w-full h-64 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
           <canvas id="dcl-canvas" class="w-full h-full"></canvas>
         </div>
+      </div>
 
-        <!-- Real-time Equilibrium Output -->
-        <div class="grid grid-cols-3 gap-2 mt-3 text-center">
-          <div class="p-2 bg-slate-950/80 rounded-xl border border-slate-800">
-            <span class="text-[10px] text-slate-400 block">Reacción $\mathbf{R}_x$</span>
-            <span id="out-rx" class="font-mono text-xs font-bold text-emerald-400">-353.6 N</span>
-          </div>
-          <div class="p-2 bg-slate-950/80 rounded-xl border border-slate-800">
-            <span class="text-[10px] text-slate-400 block">Reacción $\mathbf{R}_y$</span>
-            <span id="out-ry" class="font-mono text-xs font-bold text-emerald-400">+353.6 N</span>
-          </div>
-          <div class="p-2 bg-slate-950/80 rounded-xl border border-slate-800">
-            <span class="text-[10px] text-slate-400 block">Momento $\mathbf{M}_R$</span>
-            <span id="out-m" class="font-mono text-xs font-bold text-emerald-400">0.0 N·m</span>
-          </div>
+      <!-- Static Analysis Report -->
+      <div class="glass-panel rounded-2xl p-4 border border-slate-700 flex-1 flex flex-col">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-square-root-variable text-amber-400"></i> Informe de Ingeniería (R.C. Hibbeler)
+        </h2>
+
+        <div id="analysis-report" class="flex-1 p-3 bg-slate-950/70 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed overflow-y-auto space-y-2">
+          <p class="text-slate-500 italic">Toma una foto a una estructura mecánica para generar el cálculo de ecuaciones de equilibrio ($\sum F_x=0$, $\sum F_y=0$, $\sum M_O=0$) y las reacciones en los apoyos.</p>
         </div>
       </div>
 
@@ -164,12 +116,8 @@
   </main>
 
   <script>
-    let currentSupport = 'roller';
-    let forceMagnitude = 500;
-    let forceAngle = 45;
-    let cameraStream = null;
-    let camActive = false;
-    let cocoModel = null;
+    let base64Image = null;
+    let apiKey = localStorage.getItem('gemini_api_key') || '';
 
     const canvas = document.getElementById('dcl-canvas');
     const ctx = canvas.getContext('2d');
@@ -178,231 +126,179 @@
       if(!canvas || !canvas.parentElement) return;
       canvas.width = canvas.parentElement.clientWidth;
       canvas.height = canvas.parentElement.clientHeight;
-      drawDCL();
+      drawBlankCanvas();
     }
     window.addEventListener('resize', resizeCanvas);
 
-    const supportData = {
-      roller: { title: 'Rodillo / Patín', desc: 'Evita la traslación perpendicular a la superficie. Ejerce 1 fuerza de reacción normal ($\mathbf{F}_y$).', rx: false, ry: true, m: false },
-      pin: { title: 'Pasador Liso', desc: 'Evita la traslación en cualquier dirección ($x, y$). Ejerce 2 reacciones ($\mathbf{F}_x, \mathbf{F}_y$).', rx: true, ry: true, m: false },
-      fixed: { title: 'Empotramiento', desc: 'Evita la traslación y rotación. Ejerce 3 reacciones: $\mathbf{F}_x, \mathbf{F}_y$ y momento $\mathbf{M}$.', rx: true, ry: true, m: true },
-      cable: { title: 'Cable / Eslabón', desc: 'Ejerce una única fuerza de tensión actuando a lo largo del cable.', rx: true, ry: true, m: false }
-    };
-
-    function selectSupport(type, el) {
-      currentSupport = type;
-      document.querySelectorAll('.sup-btn').forEach(btn => {
-        btn.classList.remove('bg-blue-600/20', 'border-blue-500');
-        btn.classList.add('bg-slate-800', 'border-slate-700');
-      });
-      el.classList.remove('bg-slate-800', 'border-slate-700');
-      el.classList.add('bg-blue-600/20', 'border-blue-500');
-
-      document.getElementById('theory-desc').innerHTML = supportData[type].desc;
-      if(window.MathJax && MathJax.typeset) MathJax.typeset();
-      drawDCL();
+    function promptApiKey() {
+      const key = prompt("Introduce tu Google Gemini API Key (Gratis en Google AI Studio):", apiKey);
+      if(key !== null) {
+        apiKey = key.trim();
+        localStorage.setItem('gemini_api_key', apiKey);
+        alert('API Key guardada correctamente.');
+      }
     }
 
-    function updateParams() {
-      forceMagnitude = parseFloat(document.getElementById('slider-force').value);
-      forceAngle = parseFloat(document.getElementById('slider-angle').value);
-      document.getElementById('val-force').innerText = forceMagnitude + ' N';
-      document.getElementById('val-angle').innerText = forceAngle + '°';
-      drawDCL();
+    function handleImageSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        base64Image = e.target.result.split(',')[1];
+        const preview = document.getElementById('image-preview');
+        preview.src = e.target.result;
+        preview.classList.remove('hidden');
+        document.getElementById('placeholder-text').classList.add('hidden');
+        document.getElementById('analyze-btn').disabled = false;
+        document.getElementById('status-box').innerHTML = '<span class="text-amber-400">Imagen cargada. Lista para analizar.</span>';
+      };
+      reader.readAsDataURL(file);
     }
 
-    function drawDCL() {
+    function drawBlankCanvas() {
       if(!ctx || !canvas.width) return;
-      const w = canvas.width;
-      const h = canvas.height;
-      const cx = w / 2;
-      const cy = h / 2 + 20;
-
-      ctx.clearRect(0, 0, w, h);
-
-      // Grid
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 1;
-      for(let x=0; x<w; x+=30) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
-      for(let y=0; y<h; y+=30) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
-
-      // Ground
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(cx - 80, cy + 20, 160, 8);
-
-      // Support Symbol
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = '#94a3b8';
-      ctx.fillStyle = '#1e293b';
-
-      if(currentSupport === 'roller') {
-        ctx.beginPath();
-        ctx.arc(cx - 15, cy + 10, 8, 0, Math.PI * 2);
-        ctx.arc(cx + 15, cy + 10, 8, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
-      } else if(currentSupport === 'pin') {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx - 20, cy + 20);
-        ctx.lineTo(cx + 20, cy + 20);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-      } else if(currentSupport === 'fixed') {
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(cx - 40, cy, 80, 20);
-      }
-
-      // Beam
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(cx - 70, cy - 15, 140, 15);
-      ctx.strokeStyle = '#0284c7';
-      ctx.strokeRect(cx - 70, cy - 15, 140, 15);
-
-      // Force Vector
-      const rad = (forceAngle * Math.PI) / 180;
-      const len = (forceMagnitude / 1000) * 60 + 30;
-      const fx = Math.cos(rad) * len;
-      const fy = -Math.sin(rad) * len;
-
-      drawArrow(cx, cy - 15, cx + fx, cy - 15 + fy, '#f59e0b', 'F=' + forceMagnitude + 'N');
-
-      // Calculations
-      const fXVal = forceMagnitude * Math.cos(rad);
-      const fYVal = forceMagnitude * Math.sin(rad);
-      const data = supportData[currentSupport];
-
-      if(data.rx) { drawArrow(cx, cy - 7, cx + (-fXVal > 0 ? 40 : -40), cy - 7, '#10b981', 'Rx'); }
-      if(data.ry) { drawArrow(cx, cy, cx, cy - 45, '#10b981', 'Ry'); }
-
-      document.getElementById('out-rx').innerText = (data.rx ? (-fXVal).toFixed(1) : '0.0') + ' N';
-      document.getElementById('out-ry').innerText = (data.ry ? (fYVal).toFixed(1) : '0.0') + ' N';
-      document.getElementById('out-m').innerText = (data.m ? (fXVal * 0.5).toFixed(1) : '0.0') + ' N·m';
+      for(let x=0; x<canvas.width; x+=25) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+      for(let y=0; y<canvas.height; y+=25) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
     }
 
-    function drawArrow(fromx, fromy, tox, toy, color, label) {
-      const headlen = 8;
-      const dx = tox - fromx;
-      const dy = toy - fromy;
-      const angle = Math.atan2(dy, dx);
+    async function analyzeStructureImage() {
+      if (!base64Image) return;
 
-      ctx.strokeStyle = color;
-      ctx.fillStyle = color;
+      if (!apiKey) {
+        promptApiKey();
+        if (!apiKey) return;
+      }
+
+      const statusBox = document.getElementById('status-box');
+      const reportBox = document.getElementById('analysis-report');
+      statusBox.innerHTML = '<span class="text-blue-400 animate-pulse"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Procesando imagen con Visión Por Computadora...</span>';
+      reportBox.innerHTML = '<p class="text-slate-400">Analizando apoyos, cargas y geometría de la foto...</p>';
+
+      const promptText = `Eres un profesor de ingeniería mecánica experto en estática según R.C. Hibbeler. 
+Analiza la estructura mecánica de la foto adjunta y responde exactamente en formato JSON con la siguiente estructura:
+{
+  "tipo_estructura": "Viga simplemente apoyada / Armadura / Marco",
+  "soportes_detectados": ["Pasador en A", "Rodillo en B"],
+  "cargas_detectadas": ["Carga puntual de 500 N"],
+  "explicacion_dcl": "Descripción detallada del diagrama de cuerpo libre",
+  "ecuaciones_equilibrio": [
+    "\\sum F_x = 0 \\implies A_x = 0",
+    "\\sum F_y = 0 \\implies A_y + B_y - F = 0",
+    "\\sum M_A = 0 \\implies B_y(L) - F(d) = 0"
+  ]
+}`;
+
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+              ]
+            }]
+          })
+        });
+
+        const data = await response.json();
+        const textResult = data.candidates[0].content.parts[0].text;
+        
+        // Extraer JSON
+        const jsonMatch = textResult.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const resultJson = JSON.parse(jsonMatch[0]);
+          renderAnalysisResult(resultJson);
+          statusBox.innerHTML = '<span class="text-emerald-400">¡Análisis finalizado con éxito!</span>';
+        } else {
+          reportBox.innerText = textResult;
+          statusBox.innerHTML = '<span class="text-emerald-400">Análisis completado (Formato texto).</span>';
+        }
+
+      } catch (err) {
+        console.error(err);
+        statusBox.innerHTML = '<span class="text-red-400">Error al procesar la imagen. Revisa tu API Key.</span>';
+        reportBox.innerHTML = '<p class="text-red-400">Hubo un problema al conectar con el motor de visión IA.</p>';
+      }
+    }
+
+    function renderAnalysisResult(res) {
+      const reportBox = document.getElementById('analysis-report');
+      
+      let html = `<div class="space-y-3">
+        <div>
+          <span class="font-bold text-blue-400">Estructura Identificada:</span>
+          <p class="text-slate-200 font-semibold">${res.tipo_estructura}</p>
+        </div>
+        <div>
+          <span class="font-bold text-amber-400">Soportes Identificados:</span>
+          <ul class="list-disc list-inside text-slate-300">
+            ${res.soportes_detectados.map(s => `<li>${s}</li>`).join('')}
+          </ul>
+        </div>
+        <div>
+          <span class="font-bold text-emerald-400">Cargas y Fuerzas:</span>
+          <ul class="list-disc list-inside text-slate-300">
+            ${res.cargas_detectadas.map(c => `<li>${c}</li>`).join('')}
+          </ul>
+        </div>
+        <div>
+          <span class="font-bold text-purple-400">Explicación del DCL:</span>
+          <p class="text-slate-300">${res.explicacion_dcl}</p>
+        </div>
+        <div>
+          <span class="font-bold text-blue-300">Ecuaciones de Equilibrio:</span>
+          <div class="bg-slate-900 p-2 rounded-lg border border-slate-800 space-y-1">
+            ${res.ecuaciones_equilibrio.map(eq => `<p>$${eq}$</p>`).join('')}
+          </div>
+        </div>
+      </div>`;
+
+      reportBox.innerHTML = html;
+      if(window.MathJax && MathJax.typeset) MathJax.typeset();
+      drawReconstructedDCL(res);
+    }
+
+    function drawReconstructedDCL(res) {
+      drawBlankCanvas();
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2 + 10;
+
+      // Dibujar estructura básica en canvas
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.strokeRect(cx - 90, cy - 15, 180, 15);
+
+      // Dibujar apoyos
       ctx.lineWidth = 2.5;
-
+      ctx.strokeStyle = '#10b981';
       ctx.beginPath();
-      ctx.moveTo(fromx, fromy);
-      ctx.lineTo(tox, toy);
+      ctx.moveTo(cx - 80, cy);
+      ctx.lineTo(cx - 95, cy + 20);
+      ctx.lineTo(cx - 65, cy + 20);
+      ctx.closePath();
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.moveTo(tox, toy);
-      ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-      ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
-      ctx.closePath();
-      ctx.fill();
+      ctx.arc(cx + 80, cy + 10, 8, 0, Math.PI * 2);
+      ctx.stroke();
 
-      if(label) {
-        ctx.font = 'bold 10px sans-serif';
-        ctx.fillText(label, tox + 5, toy);
-      }
-    }
-
-    // --- TensorFlow.js Object Detector ---
-    async function toggleCamera() {
-      const camContainer = document.getElementById('webcam-container');
-      const btnText = document.getElementById('cam-btn-text');
-      const scanStatus = document.getElementById('scan-status-text');
-
-      if (!camActive) {
-        try {
-          camContainer.classList.remove('hidden');
-          scanStatus.innerText = 'Cargando IA de escaneo...';
-          btnText.innerText = 'Detener Escáner';
-          
-          if (!cocoModel) {
-            cocoModel = await cocoSsd.load();
-          }
-          
-          await startWebcam();
-          camActive = true;
-          scanStatus.innerText = 'Escaneando en vivo...';
-          detectLoop();
-        } catch(err) {
-          alert('Error al acceder a la cámara o cargar la IA de objetos.');
-          console.error(err);
-        }
-      } else {
-        stopWebcam();
-        camContainer.classList.add('hidden');
-        btnText.innerText = 'Escanear Objetos';
-        camActive = false;
-      }
-    }
-
-    function startWebcam() {
-      return new Promise((resolve, reject) => {
-        const video = document.getElementById('webcam');
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-          .then((stream) => {
-            cameraStream = stream;
-            video.srcObject = stream;
-            video.onloadedmetadata = () => {
-              video.play();
-              resolve();
-            };
-          })
-          .catch(reject);
-      });
-    }
-
-    function stopWebcam() {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        cameraStream = null;
-      }
-    }
-
-    async function detectLoop() {
-      if (!camActive) return;
-      const video = document.getElementById('webcam');
-      const webcamCanvas = document.getElementById('webcam-canvas');
-      const wCtx = webcamCanvas.getContext('2d');
-
-      if (video.readyState === 4 && cocoModel) {
-        webcamCanvas.width = video.videoWidth;
-        webcamCanvas.height = video.videoHeight;
-        
-        const predictions = await cocoModel.detect(video);
-        wCtx.clearRect(0, 0, webcamCanvas.width, webcamCanvas.height);
-
-        if (predictions.length > 0) {
-          const topObj = predictions[0];
-          document.getElementById('detected-name').innerText = `${topObj.class.toUpperCase()} (${Math.round(topObj.score * 100)}%)`;
-
-          // Modificar fuerza estática en base al tamaño del objeto detectado
-          const objArea = topObj.bbox[2] * topObj.bbox[3];
-          forceMagnitude = Math.min(1000, Math.max(100, Math.round(objArea / 300)));
-          document.getElementById('slider-force').value = forceMagnitude;
-          updateParams();
-
-          // Dibujar caja táctica sobre el objeto
-          predictions.forEach(pred => {
-            const [x, y, width, height] = pred.bbox;
-            wCtx.strokeStyle = '#10b981';
-            wCtx.lineWidth = 2;
-            wCtx.strokeRect(x, y, width, height);
-
-            wCtx.fillStyle = '#10b981';
-            wCtx.font = '10px sans-serif';
-            wCtx.fillText(`${pred.class} ${Math.round(pred.score * 100)}%`, x, y > 10 ? y - 5 : 10);
-          });
-        }
-      }
-      requestAnimationFrame(detectLoop);
+      // Dibujar fuerzas
+      ctx.strokeStyle = '#f59e0b';
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 60);
+      ctx.lineTo(cx, cy - 15);
+      ctx.stroke();
     }
 
     window.onload = () => {
-      setTimeout(() => { resizeCanvas(); updateParams(); }, 150);
+      setTimeout(resizeCanvas, 150);
     };
   </script>
 </body>
