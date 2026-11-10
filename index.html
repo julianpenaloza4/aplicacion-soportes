@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Análisis Estático CAD - Soportes Hibbeler</title>
+  <title>Análisis Estático CAD - Escáner de Objetos</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -19,10 +19,9 @@
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
-  <!-- MediaPipe Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <!-- TensorFlow.js & COCO-SSD para Escanear Objetos -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 
   <style>
     .glass-panel {
@@ -34,39 +33,34 @@
 </head>
 <body class="min-h-full text-slate-100 flex flex-col font-sans select-none bg-slate-900">
 
-  <!-- Puntero Virtual de MediaPipe -->
-  <div id="virtual-pointer" class="hidden fixed w-8 h-8 rounded-full border-2 border-amber-400 bg-amber-400/30 z-50 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center shadow-lg pointer-events-none transition-all duration-75">
-    <div id="pointer-dot" class="w-2 h-2 bg-amber-400 rounded-full"></div>
-  </div>
-
   <!-- Header -->
   <header class="glass-panel sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b border-slate-700">
     <div class="flex items-center space-x-3">
       <div class="p-2 bg-blue-600 rounded-lg shadow-lg">
-        <i class="fa-solid fa-compass-drafting text-lg text-white"></i>
+        <i class="fa-solid fa-cube text-lg text-white"></i>
       </div>
       <div>
         <h1 class="font-bold text-base text-white leading-none">Estática CAD Lab</h1>
-        <span class="text-[10px] text-slate-400">R.C. Hibbeler + MediaPipe</span>
+        <span class="text-[10px] text-slate-400">Escáner de Objetos (TensorFlow.js COCO-SSD)</span>
       </div>
     </div>
     
-    <!-- Controls WebCam -->
+    <!-- Controls WebCam Scanner -->
     <div class="flex items-center space-x-2">
       <button id="toggle-cam" onclick="toggleCamera()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-xs font-semibold flex items-center space-x-1.5 text-white transition">
-        <i class="fa-solid fa-camera text-white" id="cam-icon"></i>
-        <span id="cam-btn-text">Cámara / Gestos</span>
+        <i class="fa-solid fa-expand text-white" id="cam-icon"></i>
+        <span id="cam-btn-text">Escanear Objetos</span>
       </button>
     </div>
   </header>
 
   <!-- WebCam Floating Video Feed -->
-  <div id="webcam-container" class="hidden fixed bottom-4 right-4 z-50 glass-panel rounded-xl p-2 shadow-2xl border border-slate-700 w-40">
+  <div id="webcam-container" class="hidden fixed bottom-4 right-4 z-50 glass-panel rounded-xl p-2 shadow-2xl border border-slate-700 w-64">
     <div class="relative w-full aspect-video rounded-lg overflow-hidden bg-black">
-      <video id="webcam" class="w-full h-full object-cover transform -scale-x-100" playsinline></video>
-      <canvas id="webcam-canvas" class="absolute inset-0 w-full h-full transform -scale-x-100"></canvas>
+      <video id="webcam" class="w-full h-full object-cover" playsinline muted></video>
+      <canvas id="webcam-canvas" class="absolute inset-0 w-full h-full"></canvas>
     </div>
-    <div id="gest-status-text" class="text-[10px] text-amber-400 mt-1 text-center font-semibold">Buscando mano...</div>
+    <div id="scan-status-text" class="text-[10px] text-amber-400 mt-1 text-center font-semibold">Cargando modelo de objetos...</div>
   </div>
 
   <!-- Main Grid -->
@@ -124,6 +118,12 @@
           </div>
         </div>
 
+        <!-- Object Detector Live Status -->
+        <div id="detected-object-box" class="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider block mb-1">Último Objeto Escaneado</span>
+          <span id="detected-name" class="font-bold text-emerald-400">Ningún objeto detectado</span>
+        </div>
+
         <div id="theory-box" class="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs leading-relaxed text-slate-300">
           <p class="font-semibold text-blue-400 mb-1">Restricciones del Soporte:</p>
           <p id="theory-desc">Un rodillo impide únicamente el movimiento perpendicular a la superficie. Ejerce una única fuerza normal.</p>
@@ -167,8 +167,9 @@
     let currentSupport = 'roller';
     let forceMagnitude = 500;
     let forceAngle = 45;
-    let camera = null;
+    let cameraStream = null;
     let camActive = false;
+    let cocoModel = null;
 
     const canvas = document.getElementById('dcl-canvas');
     const ctx = canvas.getContext('2d');
@@ -306,74 +307,98 @@
       }
     }
 
+    // --- TensorFlow.js Object Detector ---
     async function toggleCamera() {
       const camContainer = document.getElementById('webcam-container');
       const btnText = document.getElementById('cam-btn-text');
+      const scanStatus = document.getElementById('scan-status-text');
 
       if (!camActive) {
         try {
-          await initMediaPipe();
           camContainer.classList.remove('hidden');
-          btnText.innerText = 'Apagar Cámara';
+          scanStatus.innerText = 'Cargando IA de escaneo...';
+          btnText.innerText = 'Detener Escáner';
+          
+          if (!cocoModel) {
+            cocoModel = await cocoSsd.load();
+          }
+          
+          await startWebcam();
           camActive = true;
+          scanStatus.innerText = 'Escaneando en vivo...';
+          detectLoop();
         } catch(err) {
-          alert('Asegúrate de permitir el acceso a la cámara en tu navegador.');
+          alert('Error al acceder a la cámara o cargar la IA de objetos.');
+          console.error(err);
         }
       } else {
-        if(camera) camera.stop();
+        stopWebcam();
         camContainer.classList.add('hidden');
-        document.getElementById('virtual-pointer').classList.add('hidden');
-        btnText.innerText = 'Cámara / Gestos';
+        btnText.innerText = 'Escanear Objetos';
         camActive = false;
       }
     }
 
-    function initMediaPipe() {
+    function startWebcam() {
       return new Promise((resolve, reject) => {
-        const videoElement = document.getElementById('webcam');
-        const canvasElement = document.getElementById('webcam-canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-
-        if(typeof Hands === 'undefined') return reject();
-
-        const hands = new Hands({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
-
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5 });
-
-        hands.onResults((results) => {
-          canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            const landmarks = results.multiHandLandmarks[0];
-            const indexTip = landmarks[8];
-            const thumbTip = landmarks[4];
-
-            const screenX = (1 - indexTip.x) * window.innerWidth;
-            const screenY = indexTip.y * window.innerHeight;
-
-            const pointer = document.getElementById('virtual-pointer');
-            pointer.classList.remove('hidden');
-            pointer.style.left = `${screenX}px`;
-            pointer.style.top = `${screenY}px`;
-
-            const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-            if (distance < 0.08) {
-              forceAngle = Math.max(0, Math.min(360, Math.round((1 - indexTip.y) * 360)));
-              document.getElementById('slider-angle').value = forceAngle;
-              updateParams();
-            }
-          }
-        });
-
-        camera = new Camera(videoElement, {
-          onFrame: async () => { await hands.send({image: videoElement}); },
-          width: 320, height: 240
-        });
-
-        camera.start().then(resolve).catch(reject);
+        const video = document.getElementById('webcam');
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+          .then((stream) => {
+            cameraStream = stream;
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+              video.play();
+              resolve();
+            };
+          })
+          .catch(reject);
       });
+    }
+
+    function stopWebcam() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+    }
+
+    async function detectLoop() {
+      if (!camActive) return;
+      const video = document.getElementById('webcam');
+      const webcamCanvas = document.getElementById('webcam-canvas');
+      const wCtx = webcamCanvas.getContext('2d');
+
+      if (video.readyState === 4 && cocoModel) {
+        webcamCanvas.width = video.videoWidth;
+        webcamCanvas.height = video.videoHeight;
+        
+        const predictions = await cocoModel.detect(video);
+        wCtx.clearRect(0, 0, webcamCanvas.width, webcamCanvas.height);
+
+        if (predictions.length > 0) {
+          const topObj = predictions[0];
+          document.getElementById('detected-name').innerText = `${topObj.class.toUpperCase()} (${Math.round(topObj.score * 100)}%)`;
+
+          // Modificar fuerza estática en base al tamaño del objeto detectado
+          const objArea = topObj.bbox[2] * topObj.bbox[3];
+          forceMagnitude = Math.min(1000, Math.max(100, Math.round(objArea / 300)));
+          document.getElementById('slider-force').value = forceMagnitude;
+          updateParams();
+
+          // Dibujar caja táctica sobre el objeto
+          predictions.forEach(pred => {
+            const [x, y, width, height] = pred.bbox;
+            wCtx.strokeStyle = '#10b981';
+            wCtx.lineWidth = 2;
+            wCtx.strokeRect(x, y, width, height);
+
+            wCtx.fillStyle = '#10b981';
+            wCtx.font = '10px sans-serif';
+            wCtx.fillText(`${pred.class} ${Math.round(pred.score * 100)}%`, x, y > 10 ? y - 5 : 10);
+          });
+        }
+      }
+      requestAnimationFrame(detectLoop);
     }
 
     window.onload = () => {
