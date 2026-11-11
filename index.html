@@ -1,340 +1,209 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full bg-slate-900">
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Escáner Mecánico Integrado - DCL en Vivo</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FontAwesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- MathJax para visualización de ecuaciones -->
-  <script>
-    window.MathJax = {
-      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
-      svg: { fontCache: 'global' }
-    };
-  </script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-
-  <style>
-    .glass-panel {
-      background: rgba(30, 41, 59, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    canvas { touch-action: none; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Estática Vision CAD – Equilibrio de viga</title>
+<style>
+:root{--bg:#f1f5f9;--panel:#fff;--bd:#cbd5e1;--tx:#0f172a;--mu:#64748b;--cv:#f8fafc;--grid:rgba(100,116,139,.18);--beam:#0284c7;--ok:#059669;--ld:#d97706;--ac:#2563eb;--bad:#dc2626;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--panel:#1e293b;--bd:#334155;--tx:#f1f5f9;--mu:#94a3b8;--cv:#020617;--grid:rgba(148,163,184,.15);--beam:#38bdf8;--ok:#34d399;--ld:#fbbf24;--ac:#3b82f6;--bad:#f87171}}
+:root[data-theme="dark"]{--bg:#0f172a;--panel:#1e293b;--bd:#334155;--tx:#f1f5f9;--mu:#94a3b8;--cv:#020617;--grid:rgba(148,163,184,.15);--beam:#38bdf8;--ok:#34d399;--ld:#fbbf24;--ac:#3b82f6;--bad:#f87171}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:14px;display:grid;gap:12px}
+@media(min-width:800px){main{grid-template-columns:1fr 1.3fr}.full{grid-column:1/-1}}
+h1{font-size:17px;margin:0}h2{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);margin:0 0 8px}
+.sub{color:var(--mu);font-size:12px}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:14px;padding:12px}
+.photo{height:250px;border:2px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mu);cursor:pointer;overflow:hidden;background:var(--cv)}
+.photo img{max-width:100%;max-height:100%;object-fit:contain}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+label{display:block;font-size:12px;color:var(--mu)}
+input,select,button{width:100%;font:inherit;color:var(--tx);background:var(--cv);border:1px solid var(--bd);border-radius:8px;padding:8px;margin-top:3px}
+button{background:var(--ac);color:#fff;border:0;font-weight:600;cursor:pointer}
+.mk{background:var(--cv);color:var(--tx);border:1px solid var(--bd)}.mk.on{background:var(--ld);color:#000;border-color:var(--ld)}
+.wrap{position:relative;height:270px;background:var(--cv);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+canvas{width:100%;height:100%;display:block}
+.res{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;white-space:pre-wrap;overflow-x:auto}
+.res b{color:var(--ok)}.warn{color:var(--bad);font-weight:600}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px}
+.kpi div{background:var(--cv);border:1px solid var(--bd);border-radius:8px;padding:6px;text-align:center;font-weight:700;color:var(--ok);font-family:ui-monospace,Menlo,monospace}
+</style>
 </head>
-<body class="min-h-full text-slate-100 flex flex-col font-sans select-none bg-slate-900">
+<body>
+<main>
+<section class="full"><h1>Estática Vision CAD</h1><div class="sub">Equilibrio de viga con distancias · Hibbeler cap. 5</div></section>
 
-  <!-- Header -->
-  <header class="glass-panel sticky top-0 z-40 px-4 py-3 flex items-center justify-between border-b border-slate-700">
-    <div class="flex items-center space-x-3">
-      <div class="p-2 bg-blue-600 rounded-lg shadow-lg">
-        <i class="fa-solid fa-microchip text-lg text-white"></i>
-      </div>
-      <div>
-        <h1 class="font-bold text-base text-white leading-none">Estática Vision CAD</h1>
-        <span class="text-[10px] text-slate-400">Motor de Análisis Mecánico Interno</span>
-      </div>
-    </div>
-  </header>
+<section class="card">
+  <h2>Foto de la estructura</h2>
+  <input type="file" id="cam" accept="image/*" capture="environment" hidden><input type="file" id="gal" accept="image/*" hidden>
+  <div class="photo" id="photo"><span>Toca para elegir una imagen de tu galería<br><small>Solo de referencia: se queda en tu dispositivo</small></span></div>
+  <div class="row"><button id="bGal" type="button">Elegir de galería</button><button id="bCam" type="button">Tomar foto</button></div>
+  <div class="row" style="grid-template-columns:repeat(3,1fr)"><button type="button" class="mk" data-m="A">Marcar A</button><button type="button" class="mk" data-m="B">Marcar B</button><button type="button" class="mk" data-m="F">Marcar carga</button></div>
+  <div class="sub" id="hint" style="margin-top:6px">Sube una foto y marca A, B y la carga sobre ella. Escribe en L la distancia real entre A y B.</div>
 
-  <!-- Main Container -->
-  <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
-    
-    <!-- Left Column: Camera Capture & Live Canvas Processing -->
-    <section class="lg:col-span-5 flex flex-col space-y-4">
-      
-      <div class="glass-panel rounded-2xl p-4 border border-slate-700 flex flex-col items-center justify-center">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 w-full flex items-center justify-between">
-          <span class="flex items-center gap-2"><i class="fa-solid fa-camera text-blue-400"></i> Escáner de Estructura</span>
-          <span id="scan-badge" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700">Esperando imagen</span>
-        </h2>
+  <h2 style="margin-top:14px">Soportes</h2>
+  <div class="row">
+    <label>Punto A (izquierda)<select id="supA"><option value="pin">Pasador (Ax, Ay)</option><option value="roller">Rodillo (Ay)</option><option value="fixed">Empotramiento (Ax, Ay, MA)</option></select></label>
+    <label>Punto B (derecha)<select id="supB"><option value="roller">Rodillo (By)</option><option value="pin">Pasador (Bx, By)</option><option value="none">Libre (voladizo)</option></select></label>
+  </div>
 
-        <!-- Hidden Input para Cámara del Móvil -->
-        <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="processLocalImage(event)">
+  <h2 style="margin-top:14px">Distancias y cargas</h2>
+  <div class="row">
+    <label>Longitud L entre A y B (m)<input id="L" type="number" value="4" min="0.1" step="0.1" inputmode="decimal"></label>
+    <label>Distancia a de A a la carga (m)<input id="a" type="number" value="2" min="0" step="0.1" inputmode="decimal"></label>
+    <label>Fuerza puntual F (N)<input id="F" type="number" value="600" min="0" step="10" inputmode="decimal"></label>
+    <label>Ángulo de F desde la vertical (°)<input id="th" type="number" value="0" min="0" max="90" step="5" inputmode="decimal"></label>
+    <label class="full" style="grid-column:1/-1">Carga distribuida w en toda la viga (N/m)<input id="w" type="number" value="0" min="0" step="10" inputmode="decimal"></label>
+  </div>
+</section>
 
-        <!-- Visor / Contenedor de Captura -->
-        <div id="preview-container" onclick="document.getElementById('camera-input').click()" class="w-full h-64 border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-xl flex flex-col items-center justify-center cursor-pointer bg-slate-950 overflow-hidden relative transition">
-          <canvas id="processing-canvas" class="w-full h-full object-contain hidden"></canvas>
-          <div id="placeholder-text" class="text-center p-4">
-            <i class="fa-solid fa-expand text-4xl text-blue-500 mb-2 animate-pulse"></i>
-            <p class="text-xs font-semibold text-slate-200">Toca para tomar foto a la estructura</p>
-            <p class="text-[10px] text-slate-400 mt-1">Sistemas de vigas, soportes o diagramas</p>
-          </div>
-        </div>
+<section class="card">
+  <h2>Diagrama de cuerpo libre</h2>
+  <div class="wrap"><canvas id="cv"></canvas></div>
+  <div class="kpi" id="kpi"></div>
+</section>
 
-        <div class="w-full grid grid-cols-2 gap-2 mt-3">
-          <button onclick="document.getElementById('camera-input').click()" class="py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 transition">
-            <i class="fa-solid fa-retake mr-1"></i> Nueva Foto
-          </button>
-          <button id="run-btn" onclick="executeInternalAnalysis()" disabled class="py-2 bg-blue-600 disabled:bg-slate-800 disabled:text-slate-500 hover:bg-blue-500 rounded-xl text-xs font-bold text-white transition shadow-lg">
-            <i class="fa-solid fa-calculator mr-1"></i> Calcular DCL
-          </button>
-        </div>
-      </div>
+<section class="card full">
+  <h2>Resolución paso a paso</h2>
+  <div class="res" id="out"></div>
+</section>
+</main>
 
-      <!-- Configuración manual rápida post-escaneo -->
-      <div class="glass-panel rounded-2xl p-4 border border-slate-700 space-y-3">
-        <h3 class="text-xs font-semibold uppercase text-slate-400 flex items-center gap-2">
-          <i class="fa-solid fa-sliders text-amber-400"></i> Ajuste de Parámetros Detectados
-        </h3>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d');
+const v=n=>parseFloat($(n).value)||0;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const f2=x=>(Math.abs(x)<5e-9?0:x).toFixed(2);
 
-        <div class="space-y-2 text-xs">
-          <div>
-            <label class="text-slate-300 block mb-1">Tipo de Soporte en Izquierda (A):</label>
-            <select id="sup-left" onchange="recalculateInternal()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200">
-              <option value="pin">Pasador Liso (2 Reacciones: Ax, Ay)</option>
-              <option value="roller">Rodillo / Patín (1 Reacción: Ay)</option>
-              <option value="fixed">Empotramiento (3 Reacciones: Ax, Ay, MA)</option>
-            </select>
-          </div>
+$('bGal').onclick=()=>$('gal').click();
+$('photo').onclick=()=>{if(!$('pimg'))$('gal').click();};
+let pts={A:null,B:null,F:null},mode=null;
+function setMode(m){mode=m;document.querySelectorAll('.mk').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $('hint').textContent=m?('Toca la foto para colocar '+(m==='F'?'la carga':'el punto '+m)+'.'):'Escribe en L la distancia real entre A y B; la distancia a se calcula sola.';}
+document.querySelectorAll('.mk').forEach(b=>b.onclick=()=>{if(!$('pimg')){$('gal').click();return;}setMode(b.dataset.m);});
+function loadImg(src){
+  pts={A:null,B:null,F:null};
+  $('photo').innerHTML='<div id="stage" style="position:relative;max-width:100%;line-height:0"><img id="pimg" alt="Estructura" style="display:block;max-width:100%;max-height:246px" src="'+src+'"><svg id="ov" style="position:absolute;inset:0;width:100%;height:100%"></svg></div>';
+  $('photo').style.cursor='crosshair';
+  $('stage').onclick=e=>{if(!mode)return;const r=$('stage').getBoundingClientRect();pts[mode]={x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height};setMode(mode==='A'?'B':mode==='B'?'F':null);drawPts();calcA();};
+  setMode('A');
+}
+function drawPts(){
+  const c={A:'var(--ac)',B:'var(--ac)',F:'var(--ld)'},p=pts;let h='';
+  if(p.A&&p.B)h+='<line x1="'+p.A.x*100+'%" y1="'+p.A.y*100+'%" x2="'+p.B.x*100+'%" y2="'+p.B.y*100+'%" style="stroke:var(--ac);stroke-width:2;stroke-dasharray:5 4"/>';
+  for(const k in p){if(!p[k])continue;h+='<circle cx="'+p[k].x*100+'%" cy="'+p[k].y*100+'%" r="6" style="fill:'+c[k]+';stroke:#fff;stroke-width:2"/><text x="'+p[k].x*100+'%" y="'+p[k].y*100+'%" dx="9" dy="-9" style="fill:#fff;font:bold 13px system-ui,sans-serif;paint-order:stroke;stroke:#000;stroke-width:3px">'+k+'</text>';}
+  $('ov').innerHTML=h;
+}
+function calcA(){
+  const A=pts.A,B=pts.B,F=pts.F,im=$('pimg');if(!A||!B||!F||!im)return;
+  const nw=im.naturalWidth,nh=im.naturalHeight,bx=(B.x-A.x)*nw,by=(B.y-A.y)*nh,fx=(F.x-A.x)*nw,fy=(F.y-A.y)*nh,d=bx*bx+by*by;if(d<1)return;
+  const t=Math.min(Math.max((fx*bx+fy*by)/d,0),1);
+  $('a').value=(t*v('L')).toFixed(2);update();
+}
+$('L').addEventListener('input',calcA);
+$('bCam').onclick=()=>$('cam').click();
+$('cam').onchange=$('gal').onchange=e=>{
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>loadImg(ev.target.result);
+  r.readAsDataURL(file);
+};
 
-          <div>
-            <label class="text-slate-300 block mb-1">Tipo de Soporte en Derecha (B):</label>
-            <select id="sup-right" onchange="recalculateInternal()" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-200">
-              <option value="roller">Rodillo / Patín (1 Reacción: By)</option>
-              <option value="pin">Pasador Liso (2 Reacciones: Bx, By)</option>
-            </select>
-          </div>
-
-          <div>
-            <div class="flex justify-between mb-1">
-              <span class="text-slate-300">Magnitud Carga Escaneada ($F$):</span>
-              <span id="force-val" class="text-amber-400 font-mono">600 N</span>
-            </div>
-            <input type="range" id="force-range" min="100" max="2000" value="600" step="50" oninput="recalculateInternal()" class="w-full accent-amber-400 bg-slate-700 rounded-lg cursor-pointer">
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- Right Column: Reconstructed DCL and Static Calculations -->
-    <section class="lg:col-span-7 flex flex-col space-y-4">
-      
-      <!-- Vector CAD Output Canvas -->
-      <div class="glass-panel rounded-2xl p-4 border border-slate-700 flex flex-col">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-3 flex items-center justify-between">
-          <span class="flex items-center gap-2"><i class="fa-solid fa-drafting-compass text-emerald-400"></i> Diagrama de Cuerpo Libre Reconstruido</span>
-          <span class="text-[10px] text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800">Equilibrio Estático $\sum \mathbf{F} = 0$</span>
-        </h2>
-
-        <div class="relative w-full h-64 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
-          <canvas id="vector-canvas" class="w-full h-full"></canvas>
-        </div>
-      </div>
-
-      <!-- Live Mechanical Calculations -->
-      <div class="glass-panel rounded-2xl p-4 border border-slate-700 flex-1 flex flex-col">
-        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2 flex items-center gap-2">
-          <i class="fa-solid fa-square-root-variable text-purple-400"></i> Resolución de Reacciones (Hibbeler Cap. 5)
-        </h2>
-
-        <div id="math-output" class="flex-1 p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed overflow-y-auto space-y-2">
-          <p class="text-slate-500 italic">Captura una foto de tu viga o estructura para calcular las ecuaciones de equilibrio en tiempo real.</p>
-        </div>
-      </div>
-
-    </section>
-  </main>
-
-  <script>
-    let rawImage = null;
-    const procCanvas = document.getElementById('processing-canvas');
-    const procCtx = procCanvas.getContext('2d');
-    const vecCanvas = document.getElementById('vector-canvas');
-    const vecCtx = vecCanvas.getContext('2d');
-
-    function resizeCanvases() {
-      if(!vecCanvas || !vecCanvas.parentElement) return;
-      vecCanvas.width = vecCanvas.parentElement.clientWidth;
-      vecCanvas.height = vecCanvas.parentElement.clientHeight;
-      recalculateInternal();
+function solve(){
+  const L=Math.max(v('L'),0.01),F=v('F'),w=v('w'),th=v('th')*Math.PI/180;
+  const a=Math.min(Math.max(v('a'),0),L);
+  const sA=$('supA').value,sB=$('supB').value;
+  const Fy=F*Math.cos(th),Fx=F*Math.sin(th),W=w*L;
+  let R={Ax:0,Ay:0,Bx:0,By:0,MA:0},steps=[],err=null;
+  steps.push('Cargas: Fy = F·cos θ = '+f2(Fy)+' N ↓ · Fx = F·sen θ = '+f2(Fx)+' N →\nW = w·L = '+f2(W)+' N, actúa en L/2 = '+f2(L/2)+' m\n');
+  if(sA==='fixed'){
+    if(sB!=='none'){err='Con empotramiento en A y apoyo en B la viga es hiperestática (más incógnitas que ecuaciones). Elige B = Libre.';}
+    else{
+      R.Ax=-Fx;R.Ay=Fy+W;R.MA=Fy*a+W*L/2;
+      steps.push('ΣFx = 0:  Ax + Fx = 0  →  Ax = '+f2(R.Ax)+' N','ΣFy = 0:  Ay − Fy − W = 0  →  Ay = '+f2(R.Ay)+' N','ΣMA = 0:  MA − Fy·a − W·L/2 = 0\n         MA = '+f2(Fy)+'·'+f2(a)+' + '+f2(W)+'·'+f2(L/2)+' = '+f2(R.MA)+' N·m (antihorario)');
     }
-    window.addEventListener('resize', resizeCanvases);
+  } else if(sB==='none'){
+    err='Con solo un soporte simple en A la viga no está en equilibrio (mecanismo). Usa empotramiento o agrega soporte en B.';
+  } else {
+    R.By=(Fy*a+W*L/2)/L;R.Ay=Fy+W-R.By;
+    steps.push('ΣMA = 0:  By·L − Fy·a − W·L/2 = 0\n         By = ('+f2(Fy)+'·'+f2(a)+' + '+f2(W)+'·'+f2(L/2)+') / '+f2(L)+' = '+f2(R.By)+' N','ΣFy = 0:  Ay + By − Fy − W = 0  →  Ay = '+f2(R.Ay)+' N');
+    if(sA==='pin'){R.Ax=-Fx;steps.push('ΣFx = 0:  Ax + Fx = 0  →  Ax = '+f2(R.Ax)+' N'+(sB==='pin'?'\n(Con pasadores en A y B, Ax y Bx son indeterminadas; se asigna toda la reacción horizontal a A y Bx = 0.)':''));}
+    else if(sB==='pin'){R.Bx=-Fx;steps.push('ΣFx = 0:  Bx + Fx = 0  →  Bx = '+f2(R.Bx)+' N');}
+    else if(Math.abs(Fx)>1e-9){err='Con dos rodillos no hay reacción horizontal: la componente Fx no queda equilibrada. Usa ángulo 0° o cambia un soporte a pasador.';}
+  }
+  return {L,a,F,Fx,Fy,w,W,sA,sB,R,steps,err};
+}
 
-    // Cargar y procesar imagen localmente sin enviar a ningún sitio exterior
-    function processLocalImage(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+function arrow(x1,y1,x2,y2,col,lab,lx,ly){
+  const hl=8,an=Math.atan2(y2-y1,x2-x1);
+  ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=2.4;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(an-.5),y2-hl*Math.sin(an-.5));ctx.lineTo(x2-hl*Math.cos(an+.5),y2-hl*Math.sin(an+.5));ctx.closePath();ctx.fill();
+  if(lab){ctx.font='bold 11px system-ui,sans-serif';ctx.fillText(lab,lx!==undefined?lx:x2+6,ly!==undefined?ly:y2)}
+}
+function support(x,y,t,lab){
+  ctx.lineWidth=2;ctx.strokeStyle=css('--mu');ctx.fillStyle=css('--panel');
+  if(t==='pin'){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-14,y+20);ctx.lineTo(x+14,y+20);ctx.closePath();ctx.fill();ctx.stroke();}
+  else if(t==='roller'){ctx.beginPath();ctx.arc(x-7,y+8,6,0,7);ctx.fill();ctx.stroke();ctx.beginPath();ctx.arc(x+7,y+8,6,0,7);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(x-18,y+15);ctx.lineTo(x+18,y+15);ctx.stroke();}
+  else if(t==='fixed'){ctx.fillStyle=css('--mu');ctx.fillRect(x-10,y-36,10,72);}
+  if(t!=='none'){ctx.fillStyle=css('--mu');ctx.font='bold 12px system-ui,sans-serif';ctx.fillText(lab,x-4,y+38);}
+}
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const img = new Image();
-        img.onload = function() {
-          rawImage = img;
-          procCanvas.width = img.width;
-          procCanvas.height = img.height;
-          procCtx.drawImage(img, 0, 0);
+function draw(s){
+  const dpr=window.devicePixelRatio||1,W=cv.parentElement.clientWidth,H=cv.parentElement.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle=css('--grid');ctx.lineWidth=1;
+  for(let x=0;x<W;x+=25){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=25){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  const x0=48,x1=W-48,cy=H*0.45,px=x0+(s.a/s.L)*(x1-x0);
+  ctx.fillStyle=css('--beam');ctx.fillRect(x0,cy-5,x1-x0,10);
+  support(x0,cy+5,s.sA,'A');support(x1,cy+5,s.sB,'B');
+  const ld=css('--ld'),ok=css('--ok');
+  if(s.w>0){ctx.fillStyle=ld;ctx.strokeStyle=ld;const n=Math.max(4,Math.floor((x1-x0)/32));
+    for(let i=0;i<=n;i++){const x=x0+i*(x1-x0)/n;arrow(x,cy-38,x,cy-7,ld);}
+    ctx.beginPath();ctx.moveTo(x0,cy-38);ctx.lineTo(x1,cy-38);ctx.stroke();ctx.font='bold 11px system-ui,sans-serif';ctx.fillText('w = '+s.w+' N/m',x0+4,cy-44);}
+  if(s.F>0){const len=52,t=Math.atan2(s.Fx,s.Fy),dx=Math.sin(t),dy=Math.cos(t);ctx.fillStyle=ld;
+    arrow(px-dx*len,cy-5-dy*len,px,cy-5,ld,'F = '+s.F+' N',px+8,cy-5-dy*len);}
+  ctx.fillStyle=ok;ctx.strokeStyle=ok;
+  const R=s.R;
+  if(!s.err){
+    if(s.sA!=='none'&&Math.abs(R.Ay)>1e-9)arrow(x0,cy+80,x0,cy+30,ok,'Ay = '+f2(R.Ay)+' N',x0+8,cy+70);
+    if(s.sB!=='none'&&Math.abs(R.By)>1e-9)arrow(x1,cy+80,x1,cy+30,ok,'By = '+f2(R.By)+' N',x1-92,cy+70);
+    if(Math.abs(R.Ax)>1e-9){const d=Math.sign(R.Ax);arrow(x0-d*(-36)-(d>0?36:0)*0,cy+60,x0+d*36,cy+60,ok,'Ax = '+f2(R.Ax),x0+8,cy+54);}
+    if(Math.abs(R.Bx)>1e-9){const d=Math.sign(R.Bx);arrow(x1,cy+60,x1+d*36,cy+60,ok,'Bx = '+f2(R.Bx),x1-60,cy+54);}
+    if(R.MA>0){ctx.beginPath();ctx.arc(x0,cy,22,Math.PI*0.9,Math.PI*1.75,false);ctx.lineWidth=2.4;ctx.stroke();ctx.font='bold 11px system-ui,sans-serif';ctx.fillText('MA = '+f2(R.MA)+' N·m',x0+8,cy-50);}
+  }
+  ctx.strokeStyle=css('--mu');ctx.fillStyle=css('--mu');ctx.lineWidth=1;ctx.font='11px system-ui,sans-serif';
+  const dy=H-22;ctx.beginPath();ctx.moveTo(x0,dy);ctx.lineTo(x1,dy);ctx.stroke();
+  ctx.fillText('L = '+f2(s.L)+' m',(x0+x1)/2-30,dy-5);
+  if(s.F>0&&s.a>0){ctx.beginPath();ctx.moveTo(x0,dy-16);ctx.lineTo(px,dy-16);ctx.stroke();ctx.fillText('a = '+f2(s.a)+' m',(x0+px)/2-24,dy-21);}
+}
 
-          procCanvas.classList.remove('hidden');
-          document.getElementById('placeholder-text').classList.add('hidden');
-          document.getElementById('run-btn').disabled = false;
-          document.getElementById('scan-badge').innerText = 'Foto lista';
-          document.getElementById('scan-badge').className = 'text-[10px] bg-blue-950 text-blue-400 px-2 py-0.5 rounded-full border border-blue-800';
-          
-          executeInternalAnalysis();
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
+function update(){
+  const s=solve(),R=s.R;
+  $('out').innerHTML=(s.err?'<span class="warn">⚠ '+s.err+'</span>':s.steps.join('\n\n'));
+  const k=[];
+  if(!s.err){
+    if(Math.abs(R.Ax)>1e-9)k.push('Ax = '+f2(R.Ax)+' N');
+    k.push('Ay = '+f2(R.Ay)+' N');
+    if(Math.abs(R.Bx)>1e-9)k.push('Bx = '+f2(R.Bx)+' N');
+    if(s.sB!=='none'&&s.sA!=='fixed')k.push('By = '+f2(R.By)+' N');
+    if(s.sA==='fixed')k.push('MA = '+f2(R.MA)+' N·m');
+  }
+  $('kpi').innerHTML=k.map(t=>'<div>'+t+'</div>').join('');
+  draw(s);
+}
 
-    // Algoritmo de procesamiento mecánico dentro de la App
-    function executeInternalAnalysis() {
-      if (!rawImage) return;
-
-      // Análisis de bordes y contraste en el Canvas para estimar inclinación de carga
-      const imgData = procCtx.getImageData(0, 0, procCanvas.width, procCanvas.height);
-      let totalBrightness = 0;
-      for (let i = 0; i < imgData.data.length; i += 4) {
-        totalBrightness += (imgData.data[i] + imgData.data[i+1] + imgData.data[i+2]) / 3;
-      }
-      const avgBrightness = totalBrightness / (imgData.data.length / 4);
-
-      // Estimación dinámica basada en la densidad visual
-      const estimatedForce = Math.round((avgBrightness / 255) * 800 + 300);
-      document.getElementById('force-range').value = estimatedForce;
-
-      document.getElementById('scan-badge').innerText = 'Análisis Procesado';
-      document.getElementById('scan-badge').className = 'text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-800';
-
-      recalculateInternal();
-    }
-
-    function recalculateInternal() {
-      if(!vecCtx || !vecCanvas.width) return;
-      
-      const w = vecCanvas.width;
-      const h = vecCanvas.height;
-      const cx = w / 2;
-      const cy = h / 2 + 20;
-
-      const supL = document.getElementById('sup-left').value;
-      const supR = document.getElementById('sup-right').value;
-      const F = parseFloat(document.getElementById('force-range').value);
-      document.getElementById('force-val').innerText = F + ' N';
-
-      // Dibujar fondo estilo CAD
-      vecCtx.clearRect(0, 0, w, h);
-      vecCtx.strokeStyle = '#1e293b';
-      vecCtx.lineWidth = 1;
-      for(let x=0; x<w; x+=25) { vecCtx.beginPath(); vecCtx.moveTo(x,0); vecCtx.lineTo(x,h); vecCtx.stroke(); }
-      for(let y=0; y<h; y+=25) { vecCtx.beginPath(); vecCtx.moveTo(0,y); vecCtx.lineTo(w,y); vecCtx.stroke(); }
-
-      // Geometría de Viga Reconstruida
-      const beamL = w * 0.6;
-      const startX = cx - beamL / 2;
-      const endX = cx + beamL / 2;
-
-      vecCtx.fillStyle = '#38bdf8';
-      vecCtx.fillRect(startX, cy - 12, beamL, 12);
-      vecCtx.strokeStyle = '#0284c7';
-      vecCtx.lineWidth = 2;
-      vecCtx.strokeRect(startX, cy - 12, beamL, 12);
-
-      // Soportes Izquierda (A) y Derecha (B)
-      drawSupportSymbol(startX, cy, supL, 'A');
-      drawSupportSymbol(endX, cy, supR, 'B');
-
-      // Fuerza Aplicada F (Centro)
-      drawVector(cx, cy - 65, cx, cy - 12, '#f59e0b', `F = ${F} N`);
-
-      // Cálculo Estático de Reacciones ($\sum F_x = 0, \sum F_y = 0, \sum M_A = 0$)
-      let Ay = 0, By = 0, Ax = 0, MA = 0;
-
-      if (supL === 'fixed') {
-        Ay = F;
-        MA = F * (beamL / 200); // Momento en N·m escalado
-        drawVector(startX, cy, startX, cy - 45, '#10b981', `Ay = ${Ay.toFixed(1)} N`);
-      } else {
-        Ay = F / 2;
-        By = F / 2;
-        drawVector(startX, cy, startX, cy - 45, '#10b981', `Ay = ${Ay.toFixed(1)} N`);
-        drawVector(endX, cy, endX, cy - 45, '#10b981', `By = ${By.toFixed(1)} N`);
-      }
-
-      // Renderizar informe de ecuaciones TeX en vivo
-      const mathBox = document.getElementById('math-output');
-      mathBox.innerHTML = `
-        <div class="space-y-2">
-          <p class="font-bold text-blue-400 border-b border-slate-800 pb-1">Sumatoria de Fuerzas en $y$ ($\sum F_y = 0$):</p>
-          <p class="font-mono text-slate-200">A_y + B_y - F = 0 \\implies A_y + B_y = ${F}\\text{ N}</p>
-          
-          <p class="font-bold text-amber-400 border-b border-slate-800 pb-1">Sumatoria de Momentos respecto a $A$ ($\sum M_A = 0$):</p>
-          <p class="font-mono text-slate-200">B_y(L) - F\\left(\\frac{L}{2}\\right) = 0 \\implies B_y = \\frac{${F}}{2} = \\mathbf{${By.toFixed(1)}\\text{ N}}</p>
-
-          <p class="font-bold text-emerald-400 border-b border-slate-800 pb-1">Resultados Finales de Reacción:</p>
-          <div class="grid grid-cols-2 gap-2 text-center font-mono font-bold">
-            <div class="p-1.5 bg-slate-900 rounded border border-slate-800 text-emerald-400">A_y = ${Ay.toFixed(1)} N</div>
-            <div class="p-1.5 bg-slate-900 rounded border border-slate-800 text-emerald-400">${supL === 'fixed' ? `M_A = ${MA.toFixed(1)} N·m` : `B_y = ${By.toFixed(1)} N`}</div>
-          </div>
-        </div>
-      `;
-      if (window.MathJax && MathJax.typeset) MathJax.typeset();
-    }
-
-    function drawSupportSymbol(x, y, type, label) {
-      vecCtx.lineWidth = 2;
-      vecCtx.strokeStyle = '#94a3b8';
-      vecCtx.fillStyle = '#1e293b';
-
-      if (type === 'pin') {
-        vecCtx.beginPath();
-        vecCtx.moveTo(x, y);
-        vecCtx.lineTo(x - 15, y + 18);
-        vecCtx.lineTo(x + 15, y + 18);
-        vecCtx.closePath();
-        vecCtx.fill(); vecCtx.stroke();
-      } else if (type === 'roller') {
-        vecCtx.beginPath();
-        vecCtx.arc(x - 8, y + 8, 6, 0, Math.PI * 2);
-        vecCtx.arc(x + 8, y + 8, 6, 0, Math.PI * 2);
-        vecCtx.fill(); vecCtx.stroke();
-      } else if (type === 'fixed') {
-        vecCtx.fillStyle = '#475569';
-        vecCtx.fillRect(x - 15, y, 30, 15);
-      }
-
-      vecCtx.font = 'bold 12px sans-serif';
-      vecCtx.fillStyle = '#94a3b8';
-      vecCtx.fillText(label, x - 4, y + 32);
-    }
-
-    function drawVector(fromx, fromy, tox, toy, color, label) {
-      const headlen = 8;
-      const angle = Math.atan2(toy - fromy, tox - fromx);
-
-      vecCtx.strokeStyle = color;
-      vecCtx.fillStyle = color;
-      vecCtx.lineWidth = 2.5;
-
-      vecCtx.beginPath();
-      vecCtx.moveTo(fromx, fromy);
-      vecCtx.lineTo(tox, toy);
-      vecCtx.stroke();
-
-      vecCtx.beginPath();
-      vecCtx.moveTo(tox, toy);
-      vecCtx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-      vecCtx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
-      vecCtx.closePath();
-      vecCtx.fill();
-
-      if (label) {
-        vecCtx.font = 'bold 10px sans-serif';
-        vecCtx.fillText(label, tox + 6, toy);
-      }
-    }
-
-    window.onload = () => {
-      setTimeout(resizeCanvases, 150);
-    };
-  </script>
+$('supA').onchange=()=>{ if($('supA').value==='fixed')$('supB').value='none'; else if($('supB').value==='none')$('supB').value='roller'; update(); };
+$('supB').onchange=update;
+['L','a','F','th','w'].forEach(i=>$(i).addEventListener('input',update));
+window.addEventListener('resize',update);
+if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',update);
+update();
+</script>
 </body>
 </html>
